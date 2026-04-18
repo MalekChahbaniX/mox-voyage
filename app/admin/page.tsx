@@ -1,14 +1,17 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useSession } from "next-auth/react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { MapPin, MessageSquare, ImageIcon, Mail, Users, TrendingUp, Calendar, Star, Eye } from "lucide-react"
+import { ProtectedRoute } from "@/components/protected-route"
 import { apiClient } from "@/lib/api-client"
 import type { ContactSubmission } from "@/lib/types"
 
-export default function AdminDashboard() {
+function AdminDashboardContent() {
+  const { data: session } = useSession()
   const [stats, setStats] = useState({
     destinations: 0,
     testimonials: 0,
@@ -31,17 +34,17 @@ export default function AdminDashboard() {
         ])
 
         const messages = messagesRes.data || []
-        const newMessages = messages.filter((m) => m.status === "new")
+        const newMessages = messages.filter((m: any) => m.status === "new")
 
         setStats({
-          destinations: destinationsRes.data?.length || 0,
-          testimonials: testimonialsRes.data?.length || 0,
-          galleryItems: galleryRes.data?.length || 0,
-          messages: messages.length,
+          destinations: (destinationsRes.data as any[])?.length || 0,
+          testimonials: (testimonialsRes.data as any[])?.length || 0,
+          galleryItems: (galleryRes.data as any[])?.length || 0,
+          messages: (messages as any[]).length,
           newMessages: newMessages.length,
         })
 
-        setRecentMessages(messages.slice(0, 5))
+        setRecentMessages((messages as any[]).slice(0, 5))
       } catch (error) {
         console.error("Error fetching dashboard data:", error)
       } finally {
@@ -268,5 +271,13 @@ export default function AdminDashboard() {
         </Card>
       </div>
     </div>
+  )
+}
+
+export default function AdminDashboard() {
+  return (
+    <ProtectedRoute requiredRoles={["admin", "manager"]}>
+      <AdminDashboardContent />
+    </ProtectedRoute>
   )
 }

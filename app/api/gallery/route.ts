@@ -1,9 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import type { GalleryItem, ApiResponse } from "@/lib/types"
-import { mockGalleryItems } from "@/lib/mock-data"
-
-// In-memory storage (replace with database in production)
-const galleryItems = [...mockGalleryItems]
+import { connectToDatabase } from "@/lib/mongodb"
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,32 +10,37 @@ export async function GET(request: NextRequest) {
     const featured = searchParams.get("featured")
     const limit = searchParams.get("limit")
 
-    let filteredItems = [...galleryItems]
+    const { db } = await connectToDatabase()
 
-    // Apply filters
+    // Build query
+    const query: any = {}
+
     if (category && category !== "Toutes") {
-      filteredItems = filteredItems.filter((item) => item.category === category)
+      query.category = category
     }
 
     if (destination) {
-      filteredItems = filteredItems.filter((item) => item.destination.toLowerCase().includes(destination.toLowerCase()))
+      query.destination = { $regex: destination, $options: "i" }
     }
 
     if (featured === "true") {
-      filteredItems = filteredItems.filter((item) => item.featured)
+      query.featured = true
     }
 
-    // Apply limit
+    // Fetch gallery items from database
+    let galleryItems = await db.collection("gallery").find(query).toArray()
+
+    // Apply limit if specified
     if (limit) {
-      filteredItems = filteredItems.slice(0, Number.parseInt(limit))
+      galleryItems = galleryItems.slice(0, Number.parseInt(limit))
     }
 
     // Sort by likes (highest first)
-    filteredItems.sort((a, b) => b.likes - a.likes)
+    galleryItems.sort((a: any, b: any) => b.likes - a.likes)
 
     return NextResponse.json<ApiResponse<GalleryItem[]>>({
       success: true,
-      data: filteredItems,
+      data: galleryItems as unknown as GalleryItem[],
     })
   } catch (error) {
     console.error("Error fetching gallery items:", error)
@@ -56,24 +58,47 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
+    // Validate required fields
+    if (!body.title || !body.image || !body.destination) {
+      return NextResponse.json<ApiResponse>(
+        {
+          success: false,
+          error: "Missing required fields",
+        },
+        { status: 400 },
+      )
+    }
+
+    const { db } = await connectToDatabase()
+
     // Create new gallery item
     const newGalleryItem: GalleryItem = {
-      id: Date.now().toString(),
+      id: `gallery_${Date.now()}`,
       ...body,
       likes: 0,
-      featured: false,
+      featured: body.featured || false,
       createdAt: new Date(),
       updatedAt: new Date(),
     }
 
-    // Add to mock database
-    galleryItems.push(newGalleryItem)
+    // Insert into database
+    const result = await db.collection("gallery").insertOne(newGalleryItem)
 
-    return NextResponse.json<ApiResponse<GalleryItem>>({
-      success: true,
-      data: newGalleryItem,
-      message: "Gallery item created successfully",
-    })
+    if (result.acknowledged) {
+      return NextResponse.json<ApiResponse<GalleryItem>>({
+        success: true,
+        data: newGalleryItem,
+        message: "Gallery item created successfully",
+      })
+    } else {
+      return NextResponse.json<ApiResponse>(
+        {
+          success: false,
+          error: "Failed to create gallery item",
+        },
+        { status: 500 },
+      )
+    }
   } catch (error) {
     console.error("Error creating gallery item:", error)
     return NextResponse.json<ApiResponse>(

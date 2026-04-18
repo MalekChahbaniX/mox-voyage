@@ -1,80 +1,97 @@
-import { SignJWT, jwtVerify } from "jose"
-import { cookies } from "next/headers"
+import NextAuth from "next-auth"
+import GoogleProvider from "next-auth/providers/google"
+import CredentialsProvider from "next-auth/providers/credentials"
+import clientPromise from "./mongodb"
+import bcrypt from "bcryptjs"
+import type { UserRole } from "./types"
+import type { NextAuthOptions } from "next-auth"
+import type { JWT } from "next-auth/jwt"
+import type { Session } from "next-auth"
 
-const secretKey = process.env.JWT_SECRET || "your-secret-key-change-in-production"
-const key = new TextEncoder().encode(secretKey)
+export const authOptions: NextAuthOptions = {
+  providers: [
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    }),
+    CredentialsProvider({
+      name: "credentials",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
+          return null
+        }
 
-export interface User {
-  id: string
-  email: string
-  name: string
-  role: "admin" | "agent" | "user"
-}
+        const client = await clientPromise()
+        const db = client.db()
+        const user = await db.collection("users").findOne({ email: credentials.email })
 
-export async function encrypt(payload: any) {
-  return await new SignJWT(payload)
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt()
-    .setExpirationTime("24h")
-    .sign(key)
-}
+        if (!user || !user.password) {
+          return null
+        }
 
-export async function decrypt(input: string): Promise<any> {
-  const { payload } = await jwtVerify(input, key, {
-    algorithms: ["HS256"],
-  })
-  return payload
-}
+        const isPasswordValid = await bcrypt.compare(credentials.password, user.password)
 
-export async function getSession() {
-  const session = cookies().get("session")?.value
-  if (!session) return null
-  return await decrypt(session)
-}
+        if (!isPasswordValid) {
+          return null
+        }
 
-export async function createSession(user: User) {
-  const expires = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
-  const session = await encrypt({ user, expires })
-
-  cookies().set("session", session, {
-    expires,
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-  })
-}
-
-export async function deleteSession() {
-  cookies().delete("session")
-}
-
-// Mock user database (replace with real database in production)
-const users: User[] = [
-  {
-    id: "1",
-    email: "admin@moxvoyage.com",
-    name: "Admin User",
-    role: "admin",
+        return {
+          id: user._id.toString(),
+          email: user.email,
+          name: `${user.firstName} ${user.lastName}`,
+          role: user.role,
+          image: user.avatar,
+        }
+      },
+    }),
+  ],
+  session: {
+    strategy: "jwt" as const,
   },
-  {
-    id: "2",
-    email: "agent@moxvoyage.com",
-    name: "Travel Agent",
-    role: "agent",
+  callbacks: {
+    async jwt({ token, user, account }: any) {
+      if (account && user) {
+        token.role = user.role
+        // For Google users, create account if it doesn't exist
+        if (account.provider === "google") {
+          const client = await clientPromise()
+          const db = client.db()
+          const existingUser = await db.collection("users").findOne({ email: user.email })
+          
+          if (!existingUser) {
+            const names = user.name?.split(" ") || ["", ""]
+            await db.collection("users").insertOne({
+              email: user.email,
+              firstName: names[0] || "",
+              lastName: names[1] || "",
+              role: "client",
+              provider: "google",
+              googleId: account.providerAccountId,
+              emailVerified: true,
+              isActive: true,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            })
+          }
+        }
+      }
+      return token
+    },
+    async session({ session, token }: any) {
+      if (token) {
+        session.user.id = token.sub!
+        session.user.role = token.role as UserRole
+      }
+      return session
+    },
   },
-]
-
-export async function verifyUser(email: string, password: string): Promise<User | null> {
-  // In production, hash and compare passwords properly
-  const mockPasswords: Record<string, string> = {
-    "admin@moxvoyage.com": "admin123",
-    "agent@moxvoyage.com": "agent123",
-  }
-
-  if (mockPasswords[email] === password) {
-    return users.find((user) => user.email === email) || null
-  }
-
-  return null
+  pages: {
+    signIn: "/auth/signin",
+  },
 }
+
+export default NextAuth(authOptions)

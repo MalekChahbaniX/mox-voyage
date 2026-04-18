@@ -1,30 +1,29 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { decrypt } from "@/lib/auth"
+import { getToken } from "next-auth/jwt"
 
 export async function middleware(request: NextRequest) {
+  const token = await getToken({ 
+    req: request, 
+    secret: process.env.NEXTAUTH_SECRET || 'your-secret-key-change-in-production'
+  })
+
   // Check if the request is for admin routes
   if (request.nextUrl.pathname.startsWith("/admin")) {
-    const session = request.cookies.get("session")?.value
-
-    if (!session) {
-      return NextResponse.redirect(new URL("/login", request.url))
+    if (!token) {
+      return NextResponse.redirect(new URL("/auth/signin", request.url))
     }
 
-    try {
-      const payload = await decrypt(session)
+    // Check if user has admin or manager role
+    if (!["admin", "manager"].includes(token.role as string)) {
+      return NextResponse.redirect(new URL("/auth/signin", request.url))
+    }
+  }
 
-      // Check if session is expired
-      if (payload.expires && new Date(payload.expires) < new Date()) {
-        return NextResponse.redirect(new URL("/login", request.url))
-      }
-
-      // Check if user has admin or agent role
-      if (!payload.user || !["admin", "agent"].includes(payload.user.role)) {
-        return NextResponse.redirect(new URL("/login", request.url))
-      }
-    } catch (error) {
-      return NextResponse.redirect(new URL("/login", request.url))
+  // Check if the request is for dashboard routes
+  if (request.nextUrl.pathname.startsWith("/dashboard")) {
+    if (!token) {
+      return NextResponse.redirect(new URL("/auth/signin", request.url))
     }
   }
 
@@ -32,5 +31,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: ["/admin/:path*", "/dashboard/:path*"],
 }

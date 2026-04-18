@@ -4,6 +4,7 @@ import { Playfair_Display, Source_Sans_3 } from "next/font/google"
 import "./globals.css"
 import { I18nProvider } from "@/lib/i18n/context"
 import { KeepAlive } from "@/components/keep-alive"
+import { Providers } from "@/components/session-provider"
 
 const playfair = Playfair_Display({
   subsets: ["latin"],
@@ -24,6 +25,11 @@ export const metadata: Metadata = {
   description:
     "Découvrez le monde avec Mox Voyage. Voyages organisés, séjours touristiques et billets d'avion pour particuliers et entreprises.",
   generator: "v0.app",
+  icons: {
+    icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
+    apple: '/favicon.svg',
+  },
 }
 
 export default function RootLayout({
@@ -33,9 +39,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr" className={`${playfair.variable} ${sourceSans.variable} antialiased`}>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+      </head>
       <body className="font-sans">
-        <I18nProvider>{children}</I18nProvider>
-        <KeepAlive />
+        <Providers>
+          <I18nProvider>{children}</I18nProvider>
+          <KeepAlive />
+        </Providers>
       </body>
     </html>
   )

@@ -1,9 +1,10 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Globe, Menu, X } from "lucide-react"
+import { Globe, Menu, X, User, LogOut } from "lucide-react"
 import Link from "next/link"
 import { useState, useEffect } from "react"
+import { useSession, signOut } from "next-auth/react"
 import QuoteModal from "./quote-modal"
 import { useI18n } from "@/lib/i18n/context"
 import LanguageSwitcher from "./language-switcher"
@@ -12,9 +13,16 @@ export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
   const [isQuoteModalOpen, setIsQuoteModalOpen] = useState(false)
+  const [isMounted, setIsMounted] = useState(false)
+  const { data: session, status } = useSession()
   const { t } = useI18n()
 
+  const handleSignOut = () => {
+    signOut({ callbackUrl: "/auth/signin" })
+  }
+
   useEffect(() => {
+    setIsMounted(true)
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 10)
     }
@@ -39,7 +47,7 @@ export default function Header() {
     <>
       <header
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ease-in-out ${
-          isScrolled
+          isMounted && isScrolled
             ? "bg-white/95 backdrop-blur-md shadow-lg transform translate-y-0"
             : "bg-white shadow-sm transform translate-y-0"
         } border-b`}
@@ -96,13 +104,57 @@ export default function Header() {
               </Link>
             </nav>
 
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-4">
               <div className="transform hover:scale-105 transition-transform duration-300">
                 <LanguageSwitcher />
               </div>
+              
+              {status === "loading" ? (
+                <div className="h-9 w-20 bg-gray-200 animate-pulse rounded hidden sm:block"></div>
+              ) : session ? (
+                <div className="hidden sm:flex items-center space-x-2 md:space-x-3">
+                  {session.user.role === "admin" || session.user.role === "manager" ? (
+                    <Link href="/admin">
+                      <Button variant="outline" size="sm" className="text-xs md:text-sm">
+                        Admin
+                      </Button>
+                    </Link>
+                  ) : (
+                    <Link href="/dashboard">
+                      <Button variant="outline" size="sm" className="text-xs md:text-sm">
+                        Dashboard
+                      </Button>
+                    </Link>
+                  )}
+                  
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleSignOut}
+                    className="text-red-600 hover:text-red-700 text-xs md:text-sm"
+                  >
+                    <LogOut className="h-4 w-4 mr-1 md:mr-2" />
+                    <span className="hidden md:inline">Sign Out</span>
+                  </Button>
+                </div>
+              ) : (
+                <div className="hidden sm:flex items-center space-x-2 md:space-x-3">
+                  <Link href="/auth/signin">
+                    <Button variant="outline" size="sm" className="text-xs md:text-sm">
+                      Sign In
+                    </Button>
+                  </Link>
+                  <Link href="/auth/signup">
+                    <Button size="sm" className="text-xs md:text-sm">
+                      Sign Up
+                    </Button>
+                  </Link>
+                </div>
+              )}
+              
               <Button
                 onClick={openQuoteModal}
-                className="hidden sm:flex bg-primary hover:bg-primary/90 transform hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5 relative overflow-hidden group"
+                className="hidden sm:flex bg-primary hover:bg-primary/90 transform hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5 relative overflow-hidden group text-xs md:text-sm px-3 md:px-4"
               >
                 <span className="relative z-10">{t.nav.requestQuote}</span>
                 <span className="absolute inset-0 bg-white/20 scale-x-0 transition-transform duration-300 group-hover:scale-x-100 origin-left"></span>
@@ -131,10 +183,10 @@ export default function Header() {
 
           <div
             className={`md:hidden overflow-hidden transition-all duration-500 ease-in-out ${
-              isMenuOpen ? "max-h-96 opacity-100 translate-y-0" : "max-h-0 opacity-0 -translate-y-4"
+              isMenuOpen ? "max-h-screen opacity-100 translate-y-0" : "max-h-0 opacity-0 -translate-y-4"
             }`}
           >
-            <nav className="py-4 space-y-2 border-t">
+            <nav className="py-4 space-y-1 border-t">
               <Link
                 href="/"
                 className="block px-4 py-3 text-foreground hover:text-primary hover:bg-gray-50 transition-all duration-300 rounded-lg mx-2 transform hover:translate-x-2"
@@ -170,13 +222,59 @@ export default function Header() {
               >
                 {t.nav.contact}
               </Link>
-              <div className="px-2 pt-2">
-                <Button
-                  onClick={openQuoteModal}
-                  className="w-full bg-primary hover:bg-primary/90 transform hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl"
-                >
-                  {t.nav.requestQuote}
-                </Button>
+              
+              {/* Mobile Auth Section */}
+              <div className="border-t mt-4 pt-4 px-2">
+                {status === "loading" ? (
+                  <div className="h-9 w-20 bg-gray-200 animate-pulse rounded mx-2"></div>
+                ) : session ? (
+                  <div className="space-y-2">
+                    {session.user.role === "admin" || session.user.role === "manager" ? (
+                      <Link href="/admin" onClick={() => setIsMenuOpen(false)}>
+                        <Button variant="outline" size="sm" className="w-full justify-start">
+                          Admin
+                        </Button>
+                      </Link>
+                    ) : (
+                      <Link href="/dashboard" onClick={() => setIsMenuOpen(false)}>
+                        <Button variant="outline" size="sm" className="w-full justify-start">
+                          Dashboard
+                        </Button>
+                      </Link>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleSignOut}
+                      className="w-full justify-start text-red-600 hover:text-red-700"
+                    >
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Sign Out
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Link href="/auth/signin" onClick={() => setIsMenuOpen(false)}>
+                      <Button variant="outline" size="sm" className="w-full">
+                        Sign In
+                      </Button>
+                    </Link>
+                    <Link href="/auth/signup" onClick={() => setIsMenuOpen(false)}>
+                      <Button size="sm" className="w-full">
+                        Sign Up
+                      </Button>
+                    </Link>
+                  </div>
+                )}
+                
+                <div className="pt-2">
+                  <Button
+                    onClick={openQuoteModal}
+                    className="w-full bg-primary hover:bg-primary/90 transform hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl"
+                  >
+                    {t.nav.requestQuote}
+                  </Button>
+                </div>
               </div>
             </nav>
           </div>

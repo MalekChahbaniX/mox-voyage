@@ -1,5 +1,79 @@
 // Data types for the Mox Voyage application
 
+export type UserRole = "admin" | "manager" | "client"
+
+export interface User {
+  id: string
+  email: string
+  firstName: string
+  lastName: string
+  phone?: string
+  role: UserRole
+  avatar?: string
+  emailVerified: boolean
+  isActive: boolean
+  lastLogin?: Date
+  createdAt: Date
+  updatedAt: Date
+  // Google OAuth specific fields
+  googleId?: string
+  provider: "email" | "google"
+}
+
+export interface AuthUser {
+  id: string
+  email: string
+  name: string
+  role: UserRole
+  avatar?: string
+}
+
+export interface LoginCredentials {
+  email: string
+  password: string
+}
+
+export interface RegisterData {
+  firstName: string
+  lastName: string
+  email: string
+  password: string
+  phone?: string
+  role: UserRole
+  agreeToTerms: boolean
+}
+
+export interface AuthResponse {
+  success: boolean
+  user?: User
+  token?: string
+  error?: string
+  message?: string
+}
+
+// NextAuth extended types
+declare module "next-auth" {
+  interface Session {
+    user: {
+      id: string
+      email: string
+      name: string
+      role: UserRole
+      image?: string
+    }
+  }
+
+  interface User {
+    role: UserRole
+  }
+}
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    role: UserRole
+  }
+}
+
 export interface Destination {
   id: string
   name: string

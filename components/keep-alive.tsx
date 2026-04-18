@@ -1,9 +1,13 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 export function KeepAlive() {
+  const [isMounted, setIsMounted] = useState(false)
+
   useEffect(() => {
+    setIsMounted(true)
+    
     const ping = () => {
       fetch('/api/keepalive')
         .then(response => {
@@ -24,6 +28,11 @@ export function KeepAlive() {
 
     return () => clearInterval(interval)
   }, [])
+
+  // Don't render anything on the server to prevent hydration mismatch
+  if (!isMounted) {
+    return null
+  }
 
   return null
 }

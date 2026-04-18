@@ -1,3 +1,5 @@
+"use client"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -5,84 +7,56 @@ import { Badge } from "@/components/ui/badge"
 import { MapPin, Search, Filter, Clock, Users, Star } from "lucide-react"
 import Header from "@/components/header"
 import Footer from "@/components/footer"
+import type { Destination } from "@/lib/types"
 
 export default function DestinationsPage() {
-  const destinations = [
-    {
-      id: 1,
-      name: "Bali, Indonésie",
-      region: "Asie",
-      image: "/placeholder.svg?height=400&width=600",
-      price: "1,299€",
-      duration: "8 jours",
-      rating: 4.8,
-      reviews: 156,
-      description: "Temples mystiques, rizières en terrasses et plages paradisiaques vous attendent.",
-      highlights: ["Temples", "Plages", "Culture", "Spa"],
-    },
-    {
-      id: 2,
-      name: "Santorin, Grèce",
-      region: "Europe",
-      image: "/placeholder.svg?height=400&width=600",
-      price: "899€",
-      duration: "5 jours",
-      rating: 4.9,
-      reviews: 203,
-      description: "Couchers de soleil magiques et architecture cycladique emblématique.",
-      highlights: ["Couchers de soleil", "Architecture", "Vin", "Romantique"],
-    },
-    {
-      id: 3,
-      name: "Machu Picchu, Pérou",
-      region: "Amérique du Sud",
-      image: "/placeholder.svg?height=400&width=600",
-      price: "1,599€",
-      duration: "10 jours",
-      rating: 4.7,
-      reviews: 89,
-      description: "Découvrez les mystères de la civilisation inca dans les Andes.",
-      highlights: ["Histoire", "Randonnée", "Andes", "Culture"],
-    },
-    {
-      id: 4,
-      name: "Safari Kenya",
-      region: "Afrique",
-      image: "/placeholder.svg?height=400&width=600",
-      price: "2,199€",
-      duration: "12 jours",
-      rating: 4.9,
-      reviews: 124,
-      description: "Safari inoubliable dans les parcs nationaux du Kenya.",
-      highlights: ["Safari", "Big Five", "Nature", "Photographie"],
-    },
-    {
-      id: 5,
-      name: "Tokyo, Japon",
-      region: "Asie",
-      image: "/placeholder.svg?height=400&width=600",
-      price: "1,799€",
-      duration: "9 jours",
-      rating: 4.8,
-      reviews: 178,
-      description: "Tradition et modernité se rencontrent dans la capitale nippone.",
-      highlights: ["Culture", "Gastronomie", "Temples", "Technologie"],
-    },
-    {
-      id: 6,
-      name: "Islande",
-      region: "Europe",
-      image: "/placeholder.svg?height=400&width=600",
-      price: "1,399€",
-      duration: "7 jours",
-      rating: 4.6,
-      reviews: 95,
-      description: "Aurores boréales, geysers et paysages lunaires extraordinaires.",
-      highlights: ["Aurores boréales", "Geysers", "Nature", "Aventure"],
-    },
-  ]
+  const [destinations, setDestinations] = useState<Destination[]>([])
+  const [filteredDestinations, setFilteredDestinations] = useState<Destination[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedRegion, setSelectedRegion] = useState("Toutes")
+  const [searchTerm, setSearchTerm] = useState("")
 
-  const regions = ["Toutes", "Europe", "Asie", "Amérique du Sud", "Afrique", "Amérique du Nord", "Océanie"]
+  useEffect(() => {
+    const fetchDestinations = async () => {
+      try {
+        const response = await fetch('/api/destinations')
+        const data = await response.json()
+        if (data.success) {
+          setDestinations(data.data)
+          setFilteredDestinations(data.data)
+        }
+      } catch (error) {
+        console.error('Error fetching destinations:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchDestinations()
+  }, [])
+
+  useEffect(() => {
+    let filtered = destinations
+
+    // Filter by region
+    if (selectedRegion !== "Toutes") {
+      filtered = filtered.filter(dest => dest.region === selectedRegion)
+    }
+
+    // Filter by search term
+    if (searchTerm) {
+      filtered = filtered.filter(dest => 
+        dest.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        dest.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        dest.country.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    }
+
+    setFilteredDestinations(filtered)
+  }, [destinations, selectedRegion, searchTerm])
+
+  // Get unique regions from destinations
+  const regions = ["Toutes", ...Array.from(new Set(destinations.map(dest => dest.region)))]
 
   return (
     <div className="min-h-screen bg-background">
@@ -104,7 +78,12 @@ export default function DestinationsPage() {
             <div className="max-w-2xl mx-auto">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
-                <Input placeholder="Rechercher une destination..." className="pl-10 pr-4 py-3 text-lg" />
+                <Input 
+                  placeholder="Rechercher une destination..." 
+                  className="pl-10 pr-4 py-3 text-lg"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
               </div>
             </div>
           </div>
@@ -123,8 +102,9 @@ export default function DestinationsPage() {
               {regions.map((region) => (
                 <Badge
                   key={region}
-                  variant={region === "Toutes" ? "default" : "outline"}
+                  variant={region === selectedRegion ? "default" : "outline"}
                   className="cursor-pointer hover:bg-primary hover:text-white transition-colors"
+                  onClick={() => setSelectedRegion(region)}
                 >
                   {region}
                 </Badge>
@@ -138,77 +118,105 @@ export default function DestinationsPage() {
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {destinations.map((destination) => (
-              <Card key={destination.id} className="overflow-hidden hover:shadow-xl transition-shadow group">
-                <div className="relative">
-                  <div
-                    className="h-64 bg-cover bg-center group-hover:scale-105 transition-transform duration-300"
-                    style={{
-                      backgroundImage: `url('${destination.image}')`,
-                    }}
-                  ></div>
-                  <div className="absolute top-4 left-4">
-                    <Badge className="bg-white text-foreground">{destination.region}</Badge>
-                  </div>
-                  <div className="absolute top-4 right-4">
-                    <div className="bg-white/90 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-1">
-                      <Star className="h-4 w-4 text-yellow-500 fill-current" />
-                      <span className="text-sm font-medium">{destination.rating}</span>
+            {loading ? (
+              // Loading skeleton
+              Array.from({ length: 6 }).map((_, index) => (
+                <Card key={index} className="overflow-hidden animate-pulse">
+                  <div className="h-64 bg-gray-300"></div>
+                  <CardContent className="p-6">
+                    <div className="h-4 bg-gray-300 rounded mb-2"></div>
+                    <div className="h-6 bg-gray-300 rounded mb-2"></div>
+                    <div className="h-4 bg-gray-300 rounded mb-4"></div>
+                    <div className="flex gap-2 mb-4">
+                      <div className="h-6 bg-gray-300 rounded w-16"></div>
+                      <div className="h-6 bg-gray-300 rounded w-16"></div>
                     </div>
-                  </div>
-                </div>
-
-                <CardContent className="p-6">
-                  <div className="flex items-center mb-2">
-                    <MapPin className="h-4 w-4 text-primary mr-1" />
-                    <span className="text-sm text-muted-foreground">{destination.region}</span>
-                  </div>
-
-                  <h3 className="text-xl font-semibold mb-2">{destination.name}</h3>
-                  <p className="text-muted-foreground mb-4 text-sm leading-relaxed">{destination.description}</p>
-
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {destination.highlights.map((highlight) => (
-                      <Badge key={highlight} variant="secondary" className="text-xs">
-                        {highlight}
-                      </Badge>
-                    ))}
-                  </div>
-
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-4 w-4" />
-                        <span>{destination.duration}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Users className="h-4 w-4" />
-                        <span>{destination.reviews} avis</span>
+                    <div className="flex justify-between">
+                      <div className="h-8 bg-gray-300 rounded w-24"></div>
+                      <div className="h-8 bg-gray-300 rounded w-20"></div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : filteredDestinations.length > 0 ? (
+              filteredDestinations.map((destination) => (
+                <Card key={destination.id} className="overflow-hidden hover:shadow-xl transition-shadow group">
+                  <div className="relative">
+                    <div
+                      className="h-64 bg-cover bg-center group-hover:scale-105 transition-transform duration-300"
+                      style={{
+                        backgroundImage: `url('${destination.image}')`,
+                      }}
+                    ></div>
+                    <div className="absolute top-4 left-4">
+                      <Badge className="bg-white text-foreground">{destination.region}</Badge>
+                    </div>
+                    <div className="absolute top-4 right-4">
+                      <div className="bg-white/90 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-1">
+                        <Star className="h-4 w-4 text-yellow-500 fill-current" />
+                        <span className="text-sm font-medium">{destination.rating}</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-2xl font-bold text-primary">À partir de {destination.price}</span>
-                      <span className="text-sm text-muted-foreground block">par personne</span>
+                  <CardContent className="p-6">
+                    <div className="flex items-center mb-2">
+                      <MapPin className="h-4 w-4 text-primary mr-1" />
+                      <span className="text-sm text-muted-foreground">{destination.country}</span>
                     </div>
-                    <Button className="bg-primary hover:bg-primary/90">Découvrir</Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+
+                    <h3 className="text-xl font-semibold mb-2">{destination.name}</h3>
+                    <p className="text-muted-foreground mb-4 text-sm leading-relaxed">{destination.description}</p>
+
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {destination.highlights.slice(0, 3).map((highlight) => (
+                        <Badge key={highlight} variant="secondary" className="text-xs">
+                          {highlight}
+                        </Badge>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-4 w-4" />
+                          <span>{destination.duration}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Users className="h-4 w-4" />
+                          <span>{destination.reviews} avis</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-2xl font-bold text-primary">À partir de {destination.price}</span>
+                        <span className="text-sm text-muted-foreground block">par personne</span>
+                      </div>
+                      <Button className="bg-primary hover:bg-primary/90">Découvrir</Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <div className="col-span-full text-center py-12">
+                <p className="text-muted-foreground text-lg">Aucune destination trouvée pour vos critères.</p>
+              </div>
+            )}
           </div>
 
-          <div className="text-center mt-12">
-            <Button
-              size="lg"
-              variant="outline"
-              className="border-primary text-primary hover:bg-primary hover:text-white bg-transparent"
-            >
-              Charger plus de destinations
-            </Button>
-          </div>
+          {!loading && filteredDestinations.length > 0 && (
+            <div className="text-center mt-12">
+              <Button
+                size="lg"
+                variant="outline"
+                className="border-primary text-primary hover:bg-primary hover:text-white bg-transparent"
+              >
+                Charger plus de destinations
+              </Button>
+            </div>
+          )}
         </div>
       </section>
 

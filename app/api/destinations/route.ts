@@ -1,9 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import type { Destination, CreateDestinationData, ApiResponse } from "@/lib/types"
-import { mockDestinations } from "@/lib/mock-data"
-
-// In-memory storage (replace with database in production)
-const destinations = [...mockDestinations]
+import { connectToDatabase } from "@/lib/mongodb"
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,33 +9,43 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get("category")
     const featured = searchParams.get("featured")
     const limit = searchParams.get("limit")
+    const country = searchParams.get("country")
 
-    let filteredDestinations = [...destinations]
+    const { db } = await connectToDatabase()
 
-    // Apply filters
+    // Build query
+    const query: any = {}
+
     if (region && region !== "Toutes") {
-      filteredDestinations = filteredDestinations.filter((d) => d.region === region)
+      query.region = region
     }
 
     if (category && category !== "Toutes") {
-      filteredDestinations = filteredDestinations.filter((d) => d.category === category)
+      query.category = category
     }
 
     if (featured === "true") {
-      filteredDestinations = filteredDestinations.filter((d) => d.featured)
+      query.featured = true
     }
 
-    // Apply limit
+    if (country && country !== "Toutes") {
+      query.country = country
+    }
+
+    // Fetch destinations from database
+    let destinations = await db.collection("destinations").find(query).toArray()
+
+    // Apply limit if specified
     if (limit) {
-      filteredDestinations = filteredDestinations.slice(0, Number.parseInt(limit))
+      destinations = destinations.slice(0, Number.parseInt(limit))
     }
 
     // Sort by rating (highest first)
-    filteredDestinations.sort((a, b) => b.rating - a.rating)
+    destinations.sort((a: any, b: any) => b.rating - a.rating)
 
     return NextResponse.json<ApiResponse<Destination[]>>({
       success: true,
-      data: filteredDestinations,
+      data: destinations as unknown as Destination[],
     })
   } catch (error) {
     console.error("Error fetching destinations:", error)
@@ -67,9 +74,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const { db } = await connectToDatabase()
+
     // Create new destination
     const newDestination: Destination = {
-      id: Date.now().toString(),
+      id: `dest_${Date.now()}`,
       ...body,
       rating: 0,
       reviews: 0,
@@ -78,14 +87,24 @@ export async function POST(request: NextRequest) {
       updatedAt: new Date(),
     }
 
-    // Add to mock database
-    destinations.push(newDestination)
+    // Insert into database
+    const result = await db.collection("destinations").insertOne(newDestination)
 
-    return NextResponse.json<ApiResponse<Destination>>({
-      success: true,
-      data: newDestination,
-      message: "Destination created successfully",
-    })
+    if (result.acknowledged) {
+      return NextResponse.json<ApiResponse<Destination>>({
+        success: true,
+        data: newDestination,
+        message: "Destination created successfully",
+      })
+    } else {
+      return NextResponse.json<ApiResponse>(
+        {
+          success: false,
+          error: "Failed to create destination",
+        },
+        { status: 500 },
+      )
+    }
   } catch (error) {
     console.error("Error creating destination:", error)
     return NextResponse.json<ApiResponse>(

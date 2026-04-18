@@ -1,9 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import type { ContactFormData, ContactSubmission, ApiResponse } from "@/lib/types"
-import { mockContactSubmissions } from "@/lib/mock-data"
-
-// In-memory storage (replace with database in production)
-const contactSubmissions = [...mockContactSubmissions]
+import { connectToDatabase } from "@/lib/mongodb"
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,31 +17,42 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const { db } = await connectToDatabase()
+
     // Create new contact submission
     const newSubmission: ContactSubmission = {
-      id: Date.now().toString(),
+      id: `contact_${Date.now()}`,
       ...body,
       status: "new",
       createdAt: new Date(),
       updatedAt: new Date(),
     }
 
-    // Add to mock database
-    contactSubmissions.push(newSubmission)
+    // Insert into database
+    const result = await db.collection("contactSubmissions").insertOne(newSubmission)
 
-    // In a real application, you would:
-    // 1. Save to database
-    // 2. Send confirmation email to customer
-    // 3. Send notification email to admin
-    // 4. Add to CRM system
+    if (result.acknowledged) {
+      // In a real application, you would:
+      // 1. Send confirmation email to customer
+      // 2. Send notification email to admin
+      // 3. Add to CRM system
 
-    console.log("New contact submission:", newSubmission)
+      console.log("New contact submission:", newSubmission)
 
-    return NextResponse.json<ApiResponse<ContactSubmission>>({
-      success: true,
-      data: newSubmission,
-      message: "Contact form submitted successfully",
-    })
+      return NextResponse.json<ApiResponse<ContactSubmission>>({
+        success: true,
+        data: newSubmission,
+        message: "Contact form submitted successfully",
+      })
+    } else {
+      return NextResponse.json<ApiResponse>(
+        {
+          success: false,
+          error: "Failed to save contact submission",
+        },
+        { status: 500 },
+      )
+    }
   } catch (error) {
     console.error("Contact form submission error:", error)
     return NextResponse.json<ApiResponse>(
@@ -59,9 +67,17 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
+    const { db } = await connectToDatabase()
+
+    // Fetch all contact submissions from database
+    const contactSubmissions = await db.collection("contactSubmissions").find({}).toArray()
+
+    // Sort by date (newest first)
+    contactSubmissions.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+
     return NextResponse.json<ApiResponse<ContactSubmission[]>>({
       success: true,
-      data: contactSubmissions,
+      data: contactSubmissions as unknown as ContactSubmission[],
     })
   } catch (error) {
     console.error("Error fetching contact submissions:", error)

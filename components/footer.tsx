@@ -94,7 +94,7 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-gray-700 mt-8 pt-8 text-center text-gray-300">
-          <p>&copy; 2024 Mox Voyage. Tous droits réservés. | Licence IM075100023</p>
+          <p>&copy; 2026 Mox Voyage. Tous droits réservés. </p>
         </div>
       </div>
     </footer>

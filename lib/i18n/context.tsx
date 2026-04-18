@@ -16,8 +16,10 @@ const I18nContext = createContext<I18nContextType | undefined>(undefined)
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguage] = useState<Language>("fr")
+  const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
+    setIsMounted(true)
     // Load saved language from localStorage
     const savedLanguage = localStorage.getItem("mox-voyage-language") as Language
     if (savedLanguage && ["fr", "en", "ar"].includes(savedLanguage)) {
@@ -26,13 +28,15 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   useEffect(() => {
-    // Save language to localStorage
-    localStorage.setItem("mox-voyage-language", language)
+    if (isMounted) {
+      // Save language to localStorage
+      localStorage.setItem("mox-voyage-language", language)
 
-    // Update document direction and lang attribute
-    document.documentElement.dir = isRTL(language) ? "rtl" : "ltr"
-    document.documentElement.lang = language
-  }, [language])
+      // Update document direction and lang attribute
+      document.documentElement.dir = isRTL(language) ? "rtl" : "ltr"
+      document.documentElement.lang = language
+    }
+  }, [language, isMounted])
 
   const t = getTranslation(language)
 

@@ -1,34 +1,46 @@
 import { type NextRequest, NextResponse } from "next/server"
 import type { Testimonial, ApiResponse } from "@/lib/types"
-import { mockTestimonials } from "@/lib/mock-data"
-
-// In-memory storage (replace with database in production)
-const testimonials = [...mockTestimonials]
+import { connectToDatabase } from "@/lib/mongodb"
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const featured = searchParams.get("featured")
     const limit = searchParams.get("limit")
+    const destination = searchParams.get("destination")
 
-    let filteredTestimonials = [...testimonials]
+    const { db } = await connectToDatabase()
 
-    // Apply filters
+    // Build query
+    const query: any = {}
+
     if (featured === "true") {
-      filteredTestimonials = filteredTestimonials.filter((t) => t.featured)
+      query.featured = true
     }
 
-    // Apply limit
+    if (destination) {
+      query.destination = { $regex: destination, $options: "i" }
+    }
+
+    // Fetch testimonials from database
+    let testimonials = await db.collection("testimonials").find(query).toArray()
+
+    // Apply limit if specified
     if (limit) {
-      filteredTestimonials = filteredTestimonials.slice(0, Number.parseInt(limit))
+      testimonials = testimonials.slice(0, Number.parseInt(limit))
     }
 
-    // Sort by date (newest first)
-    filteredTestimonials.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    // Sort by rating (highest first) and then by date (newest first)
+    testimonials.sort((a: any, b: any) => {
+      if (b.rating !== a.rating) {
+        return b.rating - a.rating
+      }
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    })
 
     return NextResponse.json<ApiResponse<Testimonial[]>>({
       success: true,
-      data: filteredTestimonials,
+      data: testimonials as unknown as Testimonial[],
     })
   } catch (error) {
     console.error("Error fetching testimonials:", error)
@@ -46,24 +58,47 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
+    // Validate required fields
+    if (!body.name || !body.review || !body.rating || !body.destination) {
+      return NextResponse.json<ApiResponse>(
+        {
+          success: false,
+          error: "Missing required fields",
+        },
+        { status: 400 },
+      )
+    }
+
+    const { db } = await connectToDatabase()
+
     // Create new testimonial
     const newTestimonial: Testimonial = {
-      id: Date.now().toString(),
+      id: `test_${Date.now()}`,
       ...body,
-      verified: false,
-      featured: false,
+      verified: body.verified || false,
+      featured: body.featured || false,
       createdAt: new Date(),
       updatedAt: new Date(),
     }
 
-    // Add to mock database
-    testimonials.push(newTestimonial)
+    // Insert into database
+    const result = await db.collection("testimonials").insertOne(newTestimonial)
 
-    return NextResponse.json<ApiResponse<Testimonial>>({
-      success: true,
-      data: newTestimonial,
-      message: "Testimonial created successfully",
-    })
+    if (result.acknowledged) {
+      return NextResponse.json<ApiResponse<Testimonial>>({
+        success: true,
+        data: newTestimonial,
+        message: "Testimonial created successfully",
+      })
+    } else {
+      return NextResponse.json<ApiResponse>(
+        {
+          success: false,
+          error: "Failed to create testimonial",
+        },
+        { status: 500 },
+      )
+    }
   } catch (error) {
     console.error("Error creating testimonial:", error)
     return NextResponse.json<ApiResponse>(
