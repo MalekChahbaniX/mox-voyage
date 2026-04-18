@@ -94,4 +94,51 @@ export const authOptions: NextAuthOptions = {
   },
 }
 
+// Helper functions for manual auth handling
+export async function verifyUser(email: string, password: string) {
+  try {
+    const client = await clientPromise()
+    const db = client.db()
+    const user = await db.collection("users").findOne({ email })
+
+    if (!user || !user.password) {
+      return null
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password)
+
+    if (!isPasswordValid) {
+      return null
+    }
+
+    return {
+      id: user._id.toString(),
+      email: user.email,
+      name: `${user.firstName} ${user.lastName}`,
+      role: user.role,
+    }
+  } catch (error) {
+    console.error("Error verifying user:", error)
+    return null
+  }
+}
+
+export async function createSession(user: any) {
+  // This would typically create a session in your database
+  // For now, this is a placeholder since NextAuth handles sessions
+  console.log("Session created for user:", user.email)
+}
+
+export async function deleteSession() {
+  // This would typically delete a session from your database
+  // For now, this is a placeholder since NextAuth handles sessions
+  console.log("Session deleted")
+}
+
+export async function getSession() {
+  // This would typically get a session from your database
+  // For now, this is a placeholder since NextAuth handles sessions
+  return null
+}
+
 export default NextAuth(authOptions)
