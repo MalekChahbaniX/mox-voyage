@@ -1,7 +1,7 @@
 import NextAuth from "next-auth"
 import GoogleProvider from "next-auth/providers/google"
 import CredentialsProvider from "next-auth/providers/credentials"
-import clientPromise from "./mongodb"
+import { connectToDatabase } from "./mongodb"
 import bcrypt from "bcryptjs"
 import type { UserRole } from "./types"
 import type { NextAuthOptions } from "next-auth"
@@ -25,8 +25,7 @@ export const authOptions: NextAuthOptions = {
           return null
         }
 
-        const client = await clientPromise()
-        const db = client.db()
+        const { db } = await connectToDatabase()
         const user = await db.collection("users").findOne({ email: credentials.email })
 
         if (!user || !user.password) {
@@ -58,8 +57,7 @@ export const authOptions: NextAuthOptions = {
         token.role = user.role
         // For Google users, create account if it doesn't exist
         if (account.provider === "google") {
-          const client = await clientPromise()
-          const db = client.db()
+          const { db } = await connectToDatabase()
           const existingUser = await db.collection("users").findOne({ email: user.email })
           
           if (!existingUser) {
@@ -97,8 +95,7 @@ export const authOptions: NextAuthOptions = {
 // Helper functions for manual auth handling
 export async function verifyUser(email: string, password: string) {
   try {
-    const client = await clientPromise()
-    const db = client.db()
+    const { db } = await connectToDatabase()
     const user = await db.collection("users").findOne({ email })
 
     if (!user || !user.password) {

@@ -10,6 +10,7 @@ import { Globe, Eye, EyeOff, AlertCircle } from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { signIn } from "next-auth/react"
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -27,19 +28,17 @@ export default function LoginPage() {
     setError("")
 
     try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+      const result = await signIn("credentials", {
+        email: formData.email,
+        password: formData.password,
+        redirect: false,
       })
 
-      const data = await response.json()
-
-      if (response.ok) {
+      if (result?.ok) {
         router.push("/admin")
         router.refresh()
       } else {
-        setError(data.error || "Login failed")
+        setError("Invalid email or password")
       }
     } catch (error) {
       setError("An error occurred. Please try again.")
